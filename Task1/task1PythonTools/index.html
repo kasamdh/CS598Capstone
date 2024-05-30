@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Access-Control-Allow-Origin" content="*">
+    <style>
+        .node circle {
+            fill: steelblue;
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+
+        .node text {
+            font: 12px Arial, sans-serif;
+            fill: #333;
+        }
+
+        .node--internal circle {
+            fill: orange;
+        }
+
+        .node--internal text {
+            font-weight: bold;
+            fill: #000;
+        }
+
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+        }
+
+        svg {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <svg width="960" height="950"></svg>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script>
+        const svg = d3.select("svg"),
+              width = +svg.attr("width"),
+              height = +svg.attr("height"),
+              g = svg.append("g").attr("transform", `translate(${width / 2},${height / 2})`);
+
+        const stratify = d3.stratify()
+            .parentId(d => d.id.substring(0, d.id.lastIndexOf(".")));
+
+        const tree = d3.cluster()
+            .size([360, 390])
+            .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth);
+
+        d3.csv("c:\Users\kasam\OneDrive\Desktop\yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_review.csv", (error, data) => {
+            if (error) throw error;
+
+            const root = tree(stratify(data)
+                .sort((a, b) => (a.height - b.height) || a.id.localeCompare(b.id)));
+
+            const link = g.selectAll(".link")
+                .data(root.descendants().slice(1))
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", d => {
+                    const [sx, sy] = project(d.x, d.y),
+                          [tx, ty] = project(d.parent.x, d.parent.y),
+                          [mx, my] = project(d.x, (d.y + d.parent.y) / 2),
+                          [nx, ny] = project(d.parent.x, (d.y + d.parent.y) / 2);
+                    return `M${sx},${sy}C${mx},${my} ${nx},${ny} ${tx},${ty}`;
+                });
+
+            const node = g.selectAll(".node")
+                .data(root.descendants())
+                .enter().append("g")
+                .attr("class", d => `node${d.children ? " node--internal" : " node--leaf"}`)
+                .attr("transform", d => `translate(${project(d.x, d.y)})`);
+
+            node.append("circle")
+                .attr("r", 4);
+
+            node.append("text")
+                .attr("dy", ".35em")
+                .attr("x", d => d.x < 180 === !d.children ? 8 : -8)
+                .style("text-anchor", d => d.x < 180 === !d.children ? "start" : "end")
+                .attr("transform", d => `rotate(${d.x < 180 ? d.x - 90 : d.x + 90})`)
+                .text(d => d.id.substring(d.id.lastIndexOf(".") + 1));
+        });
+
+        function project(x, y) {
+            const angle = (x - 90) / 180 * Math.PI;
+            const radius = y;
+            return [radius * Math.cos(angle), radius * Math.sin(angle)];
+        }
+    </script>
+</body>
+</html>
